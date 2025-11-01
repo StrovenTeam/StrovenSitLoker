@@ -1,0 +1,756 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Stroven Sit Locker</title>
+    <style>
+        * { 
+            margin: 0; 
+            padding: 0; 
+            box-sizing: border-box; 
+            font-family: 'Segoe UI', Tahoma, Geneva, Verdana, sans-serif; 
+        }
+        
+        body { 
+            background: linear-gradient(135deg, #667eea 0%, #764ba2 100%); 
+            min-height: 100vh; 
+            padding: 20px; 
+        }
+        
+        .container { 
+            max-width: 500px; 
+            margin: 0 auto; 
+        }
+        
+        .page { 
+            display: none; 
+            background: white; 
+            border-radius: 15px; 
+            padding: 30px; 
+            box-shadow: 0 10px 30px rgba(0,0,0,0.2); 
+            margin-bottom: 20px; 
+        }
+        
+        .active { 
+            display: block; 
+            animation: fadeIn 0.5s ease-in-out;
+        }
+        
+        @keyframes fadeIn {
+            from { opacity: 0; transform: translateY(20px); }
+            to { opacity: 1; transform: translateY(0); }
+        }
+        
+        .logo { 
+            text-align: center; 
+            margin-bottom: 30px; 
+        }
+        
+        .logo h1 { 
+            color: #4285f4; 
+            font-size: 32px; 
+            margin-bottom: 10px; 
+        }
+        
+        .logo p { 
+            color: #5f6368; 
+            font-size: 16px; 
+        }
+        
+        .form-group { 
+            margin-bottom: 20px; 
+        }
+        
+        label { 
+            display: block; 
+            margin-bottom: 8px; 
+            font-weight: 600; 
+            color: #333; 
+        }
+        
+        input, button { 
+            width: 100%; 
+            padding: 14px; 
+            border-radius: 8px; 
+            border: 2px solid #e1e5e9; 
+            font-size: 16px; 
+            transition: all 0.3s; 
+        }
+        
+        input:focus { 
+            outline: none; 
+            border-color: #4285f4; 
+            box-shadow: 0 0 0 3px rgba(66, 133, 244, 0.1); 
+        }
+        
+        button { 
+            background: linear-gradient(135deg, #4285f4, #34a853); 
+            color: white; 
+            border: none; 
+            cursor: pointer; 
+            font-weight: 600; 
+            margin-top: 10px; 
+            transition: all 0.3s; 
+        }
+        
+        button:hover { 
+            transform: translateY(-2px); 
+            box-shadow: 0 5px 15px rgba(0,0,0,0.2); 
+        }
+        
+        .secondary-btn { 
+            background: #f1f3f4; 
+            color: #3c4043; 
+        }
+        
+        .secondary-btn:hover { 
+            background: #e8eaed; 
+            transform: translateY(-2px); 
+        }
+        
+        .key-display { 
+            background: #1a1a1a; 
+            color: #00ff00; 
+            padding: 20px; 
+            border-radius: 10px; 
+            margin: 20px 0; 
+            text-align: center; 
+            font-family: 'Courier New', monospace; 
+            font-size: 18px; 
+            font-weight: bold; 
+            position: relative;
+            word-break: break-all;
+        }
+        
+        .copy-btn { 
+            position: absolute; 
+            top: 10px; 
+            right: 10px; 
+            background: rgba(255,255,255,0.1); 
+            border: none; 
+            color: white; 
+            width: auto; 
+            padding: 8px 12px; 
+            border-radius: 5px; 
+            cursor: pointer;
+            font-size: 14px;
+        }
+        
+        .copy-btn:hover { 
+            background: rgba(255,255,255,0.2); 
+            transform: none; 
+            box-shadow: none; 
+        }
+        
+        .notification { 
+            position: fixed; 
+            top: 20px; 
+            right: 20px; 
+            background: #34a853; 
+            color: white; 
+            padding: 15px 20px; 
+            border-radius: 8px; 
+            box-shadow: 0 4px 12px rgba(0,0,0,0.15); 
+            display: none; 
+            z-index: 1000; 
+            animation: slideIn 0.3s ease-out;
+        }
+        
+        @keyframes slideIn {
+            from { transform: translateX(100%); opacity: 0; }
+            to { transform: translateX(0); opacity: 1; }
+        }
+        
+        .error { 
+            color: #ea4335; 
+            font-size: 14px; 
+            margin-top: 5px; 
+            display: none; 
+        }
+        
+        .key-item { 
+            background: white; 
+            border-radius: 10px; 
+            padding: 20px; 
+            margin-bottom: 15px; 
+            box-shadow: 0 2px 10px rgba(0,0,0,0.1); 
+            border-left: 4px solid #4285f4; 
+            transition: all 0.3s; 
+        }
+        
+        .key-item:hover { 
+            transform: translateY(-3px); 
+            box-shadow: 0 5px 15px rgba(0,0,0,0.15); 
+        }
+        
+        .key-header { 
+            display: flex; 
+            justify-content: space-between; 
+            align-items: center; 
+            margin-bottom: 10px; 
+        }
+        
+        .key-name { 
+            font-weight: 600; 
+            font-size: 18px; 
+            color: #333; 
+        }
+        
+        .key-email { 
+            color: #5f6368; 
+            font-size: 14px; 
+            margin-bottom: 10px; 
+        }
+        
+        .key-value { 
+            background: #f8f9fa; 
+            padding: 10px; 
+            border-radius: 5px; 
+            font-family: 'Courier New', monospace; 
+            margin: 10px 0; 
+            word-break: break-all;
+        }
+        
+        .key-actions { 
+            display: flex; 
+            gap: 10px; 
+            margin-top: 15px; 
+        }
+        
+        .action-btn { 
+            padding: 8px 15px; 
+            border-radius: 5px; 
+            border: none; 
+            cursor: pointer; 
+            font-size: 14px; 
+            transition: all 0.3s; 
+            width: auto; 
+        }
+        
+        .copy-action { 
+            background: #4285f4; 
+            color: white; 
+        }
+        
+        .remove-action { 
+            background: #ea4335; 
+            color: white; 
+        }
+        
+        .no-keys { 
+            text-align: center; 
+            color: #5f6368; 
+            padding: 40px 20px; 
+        }
+        
+        .back-btn { 
+            background: none; 
+            border: none; 
+            color: #4285f4; 
+            width: auto; 
+            padding: 10px 0; 
+            margin-bottom: 20px; 
+            display: flex; 
+            align-items: center; 
+            gap: 5px; 
+            cursor: pointer;
+        }
+        
+        .back-btn:hover { 
+            background: none; 
+            transform: none; 
+            box-shadow: none; 
+            text-decoration: underline; 
+        }
+        
+        .home-header { 
+            text-align: center; 
+            margin-bottom: 30px; 
+        }
+        
+        .home-header h1 { 
+            color: #4285f4; 
+            font-size: 36px; 
+            margin-bottom: 10px; 
+        }
+        
+        .home-header p { 
+            color: #5f6368; 
+            font-size: 18px; 
+        }
+    </style>
+</head>
+<body>
+    <div class="notification" id="notification">Key copied to clipboard!</div>
+
+    <div class="container">
+        <!-- Welcome Page -->
+        <div class="page active" id="welcome-page">
+            <div class="logo">
+                <h1>Stroven Sit Locker</h1>
+                <p>Secure Key Management System</p>
+            </div>
+            <div class="form-group">
+                <button id="create-key-btn">Create New Key</button>
+            </div>
+            <div class="form-group">
+                <button class="secondary-btn" id="login-key-btn">Login with Key</button>
+            </div>
+        </div>
+
+        <!-- Create Key Page -->
+        <div class="page" id="create-key-page">
+            <div class="back-btn" id="back-to-welcome">
+                <i class="fas fa-arrow-left"></i> Back
+            </div>
+            <h2>Create Your Key</h2>
+            <div class="form-group">
+                <label for="user-name">Full Name</label>
+                <input type="text" id="user-name" placeholder="Enter your full name">
+                <div class="error" id="name-error">Name is required</div>
+            </div>
+            <div class="form-group">
+                <label for="user-email">Email Address</label>
+                <input type="email" id="user-email" placeholder="Enter your email">
+                <div class="error" id="email-error">Valid email is required</div>
+            </div>
+            <div class="form-group">
+                <label for="user-password">Password</label>
+                <input type="password" id="user-password" placeholder="Minimum 6 characters">
+                <div class="error" id="password-error">Password must be at least 6 characters</div>
+            </div>
+            <button id="generate-key-btn">Generate Key</button>
+        </div>
+
+        <!-- Key Display Page -->
+        <div class="page" id="key-display-page">
+            <div class="back-btn" id="back-to-create">
+                <i class="fas fa-arrow-left"></i> Back
+            </div>
+            <h2>Your Key is Ready!</h2>
+            <p>Save this key securely. You can use it to login to supported platforms.</p>
+            
+            <div class="key-display">
+                <span id="generated-key">STR-XXXX-XXXX-XXXX</span>
+                <button class="copy-btn" id="copy-key-btn">
+                    <i class="far fa-copy"></i> Copy
+                </button>
+            </div>
+            
+            <div class="key-info">
+                <p><strong>Name:</strong> <span id="key-user-name"></span></p>
+                <p><strong>Email:</strong> <span id="key-user-email"></span></p>
+                <p><strong>Created:</strong> <span id="key-created-at"></span></p>
+            </div>
+            
+            <button id="go-to-home">Go to Home</button>
+        </div>
+
+        <!-- Login Page -->
+        <div class="page" id="login-page">
+            <div class="back-btn" id="back-to-welcome2">
+                <i class="fas fa-arrow-left"></i> Back
+            </div>
+            <h2>Login with Key</h2>
+            <div class="form-group">
+                <label for="login-key">Enter Your Key</label>
+                <input type="text" id="login-key" placeholder="STR-XXXX-XXXX-XXXX">
+                <div class="error" id="login-error">Invalid key</div>
+            </div>
+            <button id="perform-login">Login</button>
+        </div>
+
+        <!-- Home Page -->
+        <div class="page" id="home-page">
+            <div class="home-header">
+                <h1>Stroven Sit Locker</h1>
+                <p>Manage Your Secure Keys</p>
+            </div>
+            
+            <div class="keys-section">
+                <h2 style="color: #333; margin-bottom: 20px; padding-bottom: 10px; border-bottom: 2px solid #e8eaed;">Your Keys</h2>
+                <div id="keys-list">
+                    <!-- Keys will be dynamically added here -->
+                    <div class="no-keys" id="no-keys-message">
+                        <p>No keys found. Create your first key to get started.</p>
+                    </div>
+                </div>
+            </div>
+            
+            <div class="options">
+                <button id="create-new-key">Create New Key</button>
+                <button class="secondary-btn" id="logout-btn">Logout</button>
+            </div>
+        </div>
+    </div>
+
+    <!-- Font Awesome for Icons -->
+    <script src="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.4.0/js/all.min.js"></script>
+    
+    <!-- Firebase SDK -->
+    <script src="https://www.gstatic.com/firebasejs/8.10.1/firebase-app.js"></script>
+    <script src="https://www.gstatic.com/firebasejs/8.10.1/firebase-database.js"></script>
+    
+    <script>
+        // Firebase configuration
+        const firebaseConfig = {
+            apiKey: "AIzaSyCnS5bEqwCJHSwUkDbA3gWBRvL3o5OIrrw",
+            authDomain: "chat-app-b07dc.firebaseapp.com",
+            databaseURL: "https://chat-app-b07dc-default-rtdb.firebaseio.com",
+            projectId: "chat-app-b07dc",
+            storageBucket: "chat-app-b07dc.firebasestorage.app",
+            messagingSenderId: "366248300706",
+            appId: "1:366248300706:web:70015a1c5c6e4a67e747fb",
+            measurementId: "G-SJBYJ1788H"
+        };
+
+        // Initialize Firebase
+        firebase.initializeApp(firebaseConfig);
+        const database = firebase.database();
+
+        // DOM Elements
+        const pages = document.querySelectorAll('.page');
+        const welcomePage = document.getElementById('welcome-page');
+        const createKeyPage = document.getElementById('create-key-page');
+        const keyDisplayPage = document.getElementById('key-display-page');
+        const loginPage = document.getElementById('login-page');
+        const homePage = document.getElementById('home-page');
+        
+        // Buttons
+        const createKeyBtn = document.getElementById('create-key-btn');
+        const loginKeyBtn = document.getElementById('login-key-btn');
+        const generateKeyBtn = document.getElementById('generate-key-btn');
+        const backToWelcomeBtn = document.getElementById('back-to-welcome');
+        const backToWelcome2Btn = document.getElementById('back-to-welcome2');
+        const backToCreateBtn = document.getElementById('back-to-create');
+        const copyKeyBtn = document.getElementById('copy-key-btn');
+        const goToHomeBtn = document.getElementById('go-to-home');
+        const performLoginBtn = document.getElementById('perform-login');
+        const createNewKeyBtn = document.getElementById('create-new-key');
+        const logoutBtn = document.getElementById('logout-btn');
+        
+        // Form inputs
+        const userName = document.getElementById('user-name');
+        const userEmail = document.getElementById('user-email');
+        const userPassword = document.getElementById('user-password');
+        const loginKey = document.getElementById('login-key');
+        
+        // Error messages
+        const nameError = document.getElementById('name-error');
+        const emailError = document.getElementById('email-error');
+        const passwordError = document.getElementById('password-error');
+        const loginError = document.getElementById('login-error');
+        
+        // Other elements
+        const generatedKey = document.getElementById('generated-key');
+        const keyUserName = document.getElementById('key-user-name');
+        const keyUserEmail = document.getElementById('key-user-email');
+        const keyCreatedAt = document.getElementById('key-created-at');
+        const keysList = document.getElementById('keys-list');
+        const noKeysMessage = document.getElementById('no-keys-message');
+        const notification = document.getElementById('notification');
+
+        // Global variables
+        let currentUser = null;
+        let userKeys = [];
+
+        // Show a specific page
+        function showPage(page) {
+            pages.forEach(p => p.classList.remove('active'));
+            page.classList.add('active');
+        }
+
+        // Generate a unique key
+        function generateUniqueKey() {
+            const chars = 'ABCDEFGHIJKLMNOPQRSTUVWXYZ0123456789';
+            let key = 'STR-';
+            for (let i = 0; i < 12; i++) {
+                if (i > 0 && i % 4 === 0) key += '-';
+                key += chars.charAt(Math.floor(Math.random() * chars.length));
+            }
+            return key;
+        }
+
+        // Validate user details
+        function validateUserDetails() {
+            let isValid = true;
+            
+            // Validate name
+            if (!userName.value.trim()) {
+                nameError.style.display = 'block';
+                isValid = false;
+            } else {
+                nameError.style.display = 'none';
+            }
+            
+            // Validate email
+            const emailRegex = /^[^\s@]+@[^\s@]+\.[^\s@]+$/;
+            if (!userEmail.value || !emailRegex.test(userEmail.value)) {
+                emailError.style.display = 'block';
+                isValid = false;
+            } else {
+                emailError.style.display = 'none';
+            }
+            
+            // Validate password
+            if (!userPassword.value || userPassword.value.length < 6) {
+                passwordError.style.display = 'block';
+                isValid = false;
+            } else {
+                passwordError.style.display = 'none';
+            }
+            
+            return isValid;
+        }
+
+        // Save key to Firebase
+        function saveKeyToFirebase(key, userData) {
+            const keyData = {
+                key: key,
+                name: userData.name,
+                email: userData.email,
+                password: userData.password,
+                createdAt: new Date().toISOString(),
+                isActive: true
+            };
+            
+            // Save to Firebase
+            database.ref('keys/' + key).set(keyData)
+                .then(() => {
+                    console.log('Key saved to Firebase');
+                    // Also save to local storage
+                    saveKeyToLocalStorage(keyData);
+                })
+                .catch(error => {
+                    console.error('Error saving key to Firebase:', error);
+                });
+        }
+
+        // Save key to local storage
+        function saveKeyToLocalStorage(keyData) {
+            let keys = JSON.parse(localStorage.getItem('userKeys')) || [];
+            keys.push(keyData);
+            localStorage.setItem('userKeys', JSON.stringify(keys));
+            userKeys = keys;
+        }
+
+        // Load keys from local storage
+        function loadKeysFromLocalStorage() {
+            const keys = JSON.parse(localStorage.getItem('userKeys')) || [];
+            // Only show active keys
+            userKeys = keys.filter(key => key.isActive !== false);
+            displayKeys();
+        }
+
+        // Remove key (mark as inactive)
+        function removeKey(keyToRemove) {
+            let keys = JSON.parse(localStorage.getItem('userKeys')) || [];
+            
+            // Mark key as inactive in local storage
+            keys = keys.map(key => {
+                if (key.key === keyToRemove) {
+                    return { ...key, isActive: false };
+                }
+                return key;
+            });
+            
+            localStorage.setItem('userKeys', JSON.stringify(keys));
+            
+            // Also update Firebase
+            database.ref('keys/' + keyToRemove).update({ isActive: false })
+                .then(() => {
+                    console.log('Key deactivated in Firebase');
+                })
+                .catch(error => {
+                    console.error('Error deactivating key in Firebase:', error);
+                });
+            
+            // Reload keys
+            loadKeysFromLocalStorage();
+            showNotification('Key removed successfully');
+        }
+
+        // Display keys on home page
+        function displayKeys() {
+            keysList.innerHTML = '';
+            
+            if (userKeys.length === 0) {
+                noKeysMessage.style.display = 'block';
+                return;
+            }
+            
+            noKeysMessage.style.display = 'none';
+            
+            userKeys.forEach((keyData) => {
+                const keyItem = document.createElement('div');
+                keyItem.className = 'key-item';
+                keyItem.innerHTML = `
+                    <div class="key-header">
+                        <div class="key-name">${keyData.name}</div>
+                    </div>
+                    <div class="key-email">${keyData.email}</div>
+                    <div class="key-value">${keyData.key}</div>
+                    <div class="key-actions">
+                        <button class="action-btn copy-action" data-key="${keyData.key}">
+                            <i class="far fa-copy"></i> Copy Key
+                        </button>
+                        <button class="action-btn remove-action" data-key="${keyData.key}">
+                            <i class="fas fa-trash"></i> Remove Key
+                        </button>
+                    </div>
+                `;
+                
+                keysList.appendChild(keyItem);
+            });
+            
+            // Add event listeners to action buttons
+            document.querySelectorAll('.copy-action').forEach(btn => {
+                btn.addEventListener('click', (e) => {
+                    const key = e.target.closest('button').dataset.key;
+                    copyToClipboard(key);
+                });
+            });
+            
+            document.querySelectorAll('.remove-action').forEach(btn => {
+                btn.addEventListener('click', (e) => {
+                    const key = e.target.closest('button').dataset.key;
+                    if (confirm('Are you sure you want to remove this key? It will become unusable.')) {
+                        removeKey(key);
+                    }
+                });
+            });
+        }
+
+        // Copy to clipboard
+        function copyToClipboard(text) {
+            navigator.clipboard.writeText(text)
+                .then(() => {
+                    showNotification('Key copied to clipboard!');
+                })
+                .catch(err => {
+                    console.error('Failed to copy: ', err);
+                    // Fallback method
+                    const textArea = document.createElement('textarea');
+                    textArea.value = text;
+                    document.body.appendChild(textArea);
+                    textArea.select();
+                    document.execCommand('copy');
+                    document.body.removeChild(textArea);
+                    showNotification('Key copied to clipboard!');
+                });
+        }
+
+        // Show notification
+        function showNotification(message) {
+            notification.textContent = message;
+            notification.style.display = 'block';
+            setTimeout(() => {
+                notification.style.display = 'none';
+            }, 3000);
+        }
+
+        // Event Listeners
+        createKeyBtn.addEventListener('click', () => {
+            // Reset form
+            userName.value = '';
+            userEmail.value = '';
+            userPassword.value = '';
+            nameError.style.display = 'none';
+            emailError.style.display = 'none';
+            passwordError.style.display = 'none';
+            
+            showPage(createKeyPage);
+        });
+
+        loginKeyBtn.addEventListener('click', () => {
+            loginKey.value = '';
+            loginError.style.display = 'none';
+            showPage(loginPage);
+        });
+
+        generateKeyBtn.addEventListener('click', () => {
+            if (validateUserDetails()) {
+                // Generate key
+                const key = generateUniqueKey();
+                generatedKey.textContent = key;
+                
+                // Save user data
+                const userData = {
+                    name: userName.value,
+                    email: userEmail.value,
+                    password: userPassword.value
+                };
+                
+                // Display key info
+                keyUserName.textContent = userData.name;
+                keyUserEmail.textContent = userData.email;
+                keyCreatedAt.textContent = new Date().toLocaleString();
+                
+                // Save to Firebase and local storage
+                saveKeyToFirebase(key, userData);
+                
+                showPage(keyDisplayPage);
+            }
+        });
+
+        backToWelcomeBtn.addEventListener('click', () => {
+            showPage(welcomePage);
+        });
+
+        backToWelcome2Btn.addEventListener('click', () => {
+            showPage(welcomePage);
+        });
+
+        backToCreateBtn.addEventListener('click', () => {
+            showPage(createKeyPage);
+        });
+
+        copyKeyBtn.addEventListener('click', () => {
+            copyToClipboard(generatedKey.textContent);
+        });
+
+        goToHomeBtn.addEventListener('click', () => {
+            loadKeysFromLocalStorage();
+            showPage(homePage);
+        });
+
+        performLoginBtn.addEventListener('click', () => {
+            const key = loginKey.value.trim();
+            
+            if (!key) {
+                loginError.textContent = 'Please enter your key';
+                loginError.style.display = 'block';
+                return;
+            }
+            
+            // Check if key exists and is active
+            const keys = JSON.parse(localStorage.getItem('userKeys')) || [];
+            const keyData = keys.find(k => k.key === key && k.isActive !== false);
+            
+            if (keyData) {
+                // Successful login
+                loadKeysFromLocalStorage();
+                showPage(homePage);
+            } else {
+                loginError.textContent = 'Invalid key or key has been removed';
+                loginError.style.display = 'block';
+            }
+        });
+
+        createNewKeyBtn.addEventListener('click', () => {
+            showPage(createKeyPage);
+        });
+
+        logoutBtn.addEventListener('click', () => {
+            showPage(welcomePage);
+        });
+
+        // Initialize
+        document.addEventListener('DOMContentLoaded', () => {
+            // Check if user has keys in local storage
+            loadKeysFromLocalStorage();
+        });
+    </script>
+</body>
+</html>
