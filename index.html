@@ -279,6 +279,14 @@
             color: #5f6368; 
             font-size: 18px; 
         }
+        
+        .loading { 
+            color: #4285f4; 
+        }
+        
+        .success { 
+            color: #34a853; 
+        }
     </style>
 </head>
 <body>
@@ -512,27 +520,40 @@
                 email: userData.email,
                 password: userData.password,
                 createdAt: new Date().toISOString(),
+                lastAccessed: new Date().toISOString(),
                 isActive: true
             };
             
             // Save to Firebase
-            database.ref('keys/' + key).set(keyData)
+            return database.ref('keys/' + key).set(keyData)
                 .then(() => {
                     console.log('Key saved to Firebase');
                     // Also save to local storage
                     saveKeyToLocalStorage(keyData);
+                    return keyData;
                 })
                 .catch(error => {
                     console.error('Error saving key to Firebase:', error);
+                    throw error;
                 });
         }
 
         // Save key to local storage
         function saveKeyToLocalStorage(keyData) {
             let keys = JSON.parse(localStorage.getItem('userKeys')) || [];
-            keys.push(keyData);
+            
+            // Check if key already exists
+            const existingKeyIndex = keys.findIndex(k => k.key === keyData.key);
+            if (existingKeyIndex !== -1) {
+                // Update existing key
+                keys[existingKeyIndex] = keyData;
+            } else {
+                // Add new key
+                keys.push(keyData);
+            }
+            
             localStorage.setItem('userKeys', JSON.stringify(keys));
-            userKeys = keys;
+            userKeys = keys.filter(key => key.isActive !== false);
         }
 
         // Load keys from local storage
@@ -558,13 +579,16 @@
             localStorage.setItem('userKeys', JSON.stringify(keys));
             
             // Also update Firebase
-            database.ref('keys/' + keyToRemove).update({ isActive: false })
-                .then(() => {
-                    console.log('Key deactivated in Firebase');
-                })
-                .catch(error => {
-                    console.error('Error deactivating key in Firebase:', error);
-                });
+            database.ref('keys/' + keyToRemove).update({ 
+                isActive: false,
+                deactivatedAt: new Date().toISOString()
+            })
+            .then(() => {
+                console.log('Key deactivated in Firebase');
+            })
+            .catch(error => {
+                console.error('Error deactivating key in Firebase:', error);
+            });
             
             // Reload keys
             loadKeysFromLocalStorage();
@@ -650,6 +674,27 @@
             }, 3000);
         }
 
+        // Check key in Firebase
+        async function checkKeyInFirebase(key) {
+            try {
+                const snapshot = await database.ref('keys/' + key).once('value');
+                const keyData = snapshot.val();
+                
+                if (keyData && keyData.isActive !== false) {
+                    // Update last accessed time
+                    await database.ref('keys/' + key).update({
+                        lastAccessed: new Date().toISOString()
+                    });
+                    
+                    return keyData;
+                }
+                return null;
+            } catch (error) {
+                console.error('Error checking key in Firebase:', error);
+                throw error;
+            }
+        }
+
         // Event Listeners
         createKeyBtn.addEventListener('click', () => {
             // Reset form
@@ -669,28 +714,40 @@
             showPage(loginPage);
         });
 
-        generateKeyBtn.addEventListener('click', () => {
+        generateKeyBtn.addEventListener('click', async () => {
             if (validateUserDetails()) {
-                // Generate key
-                const key = generateUniqueKey();
-                generatedKey.textContent = key;
+                // Show loading state
+                generateKeyBtn.disabled = true;
+                generateKeyBtn.textContent = 'Generating Key...';
                 
-                // Save user data
-                const userData = {
-                    name: userName.value,
-                    email: userEmail.value,
-                    password: userPassword.value
-                };
-                
-                // Display key info
-                keyUserName.textContent = userData.name;
-                keyUserEmail.textContent = userData.email;
-                keyCreatedAt.textContent = new Date().toLocaleString();
-                
-                // Save to Firebase and local storage
-                saveKeyToFirebase(key, userData);
-                
-                showPage(keyDisplayPage);
+                try {
+                    // Generate key
+                    const key = generateUniqueKey();
+                    generatedKey.textContent = key;
+                    
+                    // Save user data
+                    const userData = {
+                        name: userName.value,
+                        email: userEmail.value,
+                        password: userPassword.value
+                    };
+                    
+                    // Display key info
+                    keyUserName.textContent = userData.name;
+                    keyUserEmail.textContent = userData.email;
+                    keyCreatedAt.textContent = new Date().toLocaleString();
+                    
+                    // Save to Firebase and local storage
+                    await saveKeyToFirebase(key, userData);
+                    
+                    showPage(keyDisplayPage);
+                } catch (error) {
+                    showNotification('Error generating key. Please try again.');
+                } finally {
+                    // Reset button state
+                    generateKeyBtn.disabled = false;
+                    generateKeyBtn.textContent = 'Generate Key';
+                }
             }
         });
 
@@ -715,7 +772,7 @@
             showPage(homePage);
         });
 
-        performLoginBtn.addEventListener('click', () => {
+        performLoginBtn.addEventListener('click', async () => {
             const key = loginKey.value.trim();
             
             if (!key) {
@@ -724,17 +781,52 @@
                 return;
             }
             
-            // Check if key exists and is active
-            const keys = JSON.parse(localStorage.getItem('userKeys')) || [];
-            const keyData = keys.find(k => k.key === key && k.isActive !== false);
+            // Show loading state
+            performLoginBtn.disabled = true;
+            performLoginBtn.textContent = 'Checking Key...';
+            loginError.style.display = 'none';
             
-            if (keyData) {
-                // Successful login
-                loadKeysFromLocalStorage();
-                showPage(homePage);
-            } else {
-                loginError.textContent = 'Invalid key or key has been removed';
+            try {
+                // First check local storage
+                const localKeys = JSON.parse(localStorage.getItem('userKeys')) || [];
+                const localKeyData = localKeys.find(k => k.key === key && k.isActive !== false);
+                
+                if (localKeyData) {
+                    // Key found in local storage
+                    loadKeysFromLocalStorage();
+                    showPage(homePage);
+                    showNotification('Login successful!');
+                } else {
+                    // Key not in local storage, check Firebase
+                    loginError.textContent = 'Checking key in database...';
+                    loginError.style.display = 'block';
+                    loginError.classList.add('loading');
+                    
+                    const firebaseKeyData = await checkKeyInFirebase(key);
+                    
+                    if (firebaseKeyData) {
+                        // Key found in Firebase - save to local storage and login
+                        saveKeyToLocalStorage(firebaseKeyData);
+                        loadKeysFromLocalStorage();
+                        showPage(homePage);
+                        showNotification('Login successful! Key added to this device.');
+                    } else {
+                        loginError.textContent = 'Invalid key or key has been removed';
+                        loginError.style.display = 'block';
+                        loginError.classList.remove('loading');
+                        loginError.classList.add('error');
+                    }
+                }
+            } catch (error) {
+                console.error('Login error:', error);
+                loginError.textContent = 'Network error. Please try again.';
                 loginError.style.display = 'block';
+                loginError.classList.remove('loading');
+                loginError.classList.add('error');
+            } finally {
+                // Reset button state
+                performLoginBtn.disabled = false;
+                performLoginBtn.textContent = 'Login';
             }
         });
 
@@ -750,6 +842,13 @@
         document.addEventListener('DOMContentLoaded', () => {
             // Check if user has keys in local storage
             loadKeysFromLocalStorage();
+            
+            // Check if user was previously logged in
+            const keys = JSON.parse(localStorage.getItem('userKeys')) || [];
+            if (keys.length > 0) {
+                // Auto-login if keys exist
+                showPage(homePage);
+            }
         });
     </script>
 </body>
