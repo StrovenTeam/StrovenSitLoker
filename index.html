@@ -157,6 +157,10 @@
             animation: slideIn 0.3s ease-out;
         }
         
+        .notification.error {
+            background: #ea4335;
+        }
+        
         @keyframes slideIn {
             from { transform: translateX(100%); opacity: 0; }
             to { transform: translateX(0); opacity: 1; }
@@ -287,10 +291,39 @@
         .success { 
             color: #34a853; 
         }
+        
+        .pin-group { 
+            position: relative; 
+        }
+        
+        .pin-toggle { 
+            position: absolute; 
+            right: 10px; 
+            top: 40px; 
+            background: none; 
+            border: none; 
+            color: #5f6368; 
+            cursor: pointer; 
+            width: auto; 
+            padding: 0; 
+        }
+        
+        .offline-indicator {
+            position: fixed;
+            top: 20px;
+            left: 20px;
+            background: #ea4335;
+            color: white;
+            padding: 10px 15px;
+            border-radius: 8px;
+            display: none;
+            z-index: 1000;
+        }
     </style>
 </head>
 <body>
     <div class="notification" id="notification">Key copied to clipboard!</div>
+    <div class="offline-indicator" id="offline-indicator">You are offline</div>
 
     <div class="container">
         <!-- Welcome Page -->
@@ -323,10 +356,13 @@
                 <input type="email" id="user-email" placeholder="Enter your email">
                 <div class="error" id="email-error">Valid email is required</div>
             </div>
-            <div class="form-group">
-                <label for="user-password">Password</label>
-                <input type="password" id="user-password" placeholder="Minimum 6 characters">
-                <div class="error" id="password-error">Password must be at least 6 characters</div>
+            <div class="form-group pin-group">
+                <label for="user-pin">PIN (4-6 digits)</label>
+                <input type="password" id="user-pin" placeholder="Enter 4-6 digit PIN" maxlength="6">
+                <button class="pin-toggle" type="button" id="toggle-pin">
+                    <i class="fas fa-eye"></i>
+                </button>
+                <div class="error" id="pin-error">PIN must be 4-6 digits</div>
             </div>
             <button id="generate-key-btn">Generate Key</button>
         </div>
@@ -364,7 +400,15 @@
             <div class="form-group">
                 <label for="login-key">Enter Your Key</label>
                 <input type="text" id="login-key" placeholder="STR-XXXX-XXXX-XXXX">
-                <div class="error" id="login-error">Invalid key</div>
+                <div class="error" id="login-key-error">Key is required</div>
+            </div>
+            <div class="form-group pin-group">
+                <label for="login-pin">Enter Your PIN</label>
+                <input type="password" id="login-pin" placeholder="Enter your PIN" maxlength="6">
+                <button class="pin-toggle" type="button" id="toggle-login-pin">
+                    <i class="fas fa-eye"></i>
+                </button>
+                <div class="error" id="login-pin-error">PIN is required</div>
             </div>
             <button id="perform-login">Login</button>
         </div>
@@ -437,18 +481,22 @@
         const performLoginBtn = document.getElementById('perform-login');
         const createNewKeyBtn = document.getElementById('create-new-key');
         const logoutBtn = document.getElementById('logout-btn');
+        const togglePinBtn = document.getElementById('toggle-pin');
+        const toggleLoginPinBtn = document.getElementById('toggle-login-pin');
         
         // Form inputs
         const userName = document.getElementById('user-name');
         const userEmail = document.getElementById('user-email');
-        const userPassword = document.getElementById('user-password');
+        const userPin = document.getElementById('user-pin');
         const loginKey = document.getElementById('login-key');
+        const loginPin = document.getElementById('login-pin');
         
         // Error messages
         const nameError = document.getElementById('name-error');
         const emailError = document.getElementById('email-error');
-        const passwordError = document.getElementById('password-error');
-        const loginError = document.getElementById('login-error');
+        const pinError = document.getElementById('pin-error');
+        const loginKeyError = document.getElementById('login-key-error');
+        const loginPinError = document.getElementById('login-pin-error');
         
         // Other elements
         const generatedKey = document.getElementById('generated-key');
@@ -458,6 +506,7 @@
         const keysList = document.getElementById('keys-list');
         const noKeysMessage = document.getElementById('no-keys-message');
         const notification = document.getElementById('notification');
+        const offlineIndicator = document.getElementById('offline-indicator');
 
         // Global variables
         let currentUser = null;
@@ -469,14 +518,49 @@
             page.classList.add('active');
         }
 
-        // Generate a unique key
-        function generateUniqueKey() {
-            const chars = 'ABCDEFGHIJKLMNOPQRSTUVWXYZ0123456789';
-            let key = 'STR-';
-            for (let i = 0; i < 12; i++) {
-                if (i > 0 && i % 4 === 0) key += '-';
-                key += chars.charAt(Math.floor(Math.random() * chars.length));
+        // Check online status
+        function checkOnlineStatus() {
+            if (!navigator.onLine) {
+                offlineIndicator.style.display = 'block';
+                return false;
+            } else {
+                offlineIndicator.style.display = 'none';
+                return true;
             }
+        }
+
+        // Generate a unique key with duplicate checking
+        async function generateUniqueKey() {
+            let key;
+            let isUnique = false;
+            let attempts = 0;
+            const maxAttempts = 10;
+            
+            while (!isUnique && attempts < maxAttempts) {
+                const pattern = "STR-" + Math.random().toString(36).substring(2,6).toUpperCase() +
+                                "-" + Math.random().toString(36).substring(2,6).toUpperCase() +
+                                "-" + Math.random().toString(36).substring(2,6).toUpperCase();
+                key = pattern;
+                
+                // Check if key already exists in Firebase
+                try {
+                    const existing = await database.ref('keys/' + key).once('value');
+                    if (!existing.exists()) {
+                        isUnique = true;
+                    }
+                } catch (error) {
+                    console.error('Error checking key uniqueness:', error);
+                    // If we can't check, assume it's unique to avoid infinite loop
+                    isUnique = true;
+                }
+                
+                attempts++;
+            }
+            
+            if (!isUnique) {
+                throw new Error('Could not generate unique key after ' + maxAttempts + ' attempts');
+            }
+            
             return key;
         }
 
@@ -501,46 +585,52 @@
                 emailError.style.display = 'none';
             }
             
-            // Validate password
-            if (!userPassword.value || userPassword.value.length < 6) {
-                passwordError.style.display = 'block';
+            // Validate PIN
+            const pinRegex = /^\d{4,6}$/;
+            if (!userPin.value || !pinRegex.test(userPin.value)) {
+                pinError.style.display = 'block';
                 isValid = false;
             } else {
-                passwordError.style.display = 'none';
+                pinError.style.display = 'none';
             }
             
             return isValid;
         }
 
-        // Save key to Firebase
-        function saveKeyToFirebase(key, userData) {
+        // Save key to Firebase with verification
+        async function saveKeyToFirebase(key, userData) {
+            // Sanitize email
+            const sanitizedEmail = userData.email.trim().toLowerCase();
+            const sanitizedName = userData.name.trim();
+            
             const keyData = {
-                key: key,
-                name: userData.name,
-                email: userData.email,
-                password: userData.password,
-                createdAt: new Date().toISOString(),
-                lastAccessed: new Date().toISOString(),
-                isActive: true
+                name: sanitizedName,
+                email: sanitizedEmail,
+                password: userData.pin,
+                createdAt: Date.now(),
+                isActive: true,
+                lastAccessed: Date.now()
             };
             
             // Save to Firebase
-            return database.ref('keys/' + key).set(keyData)
-                .then(() => {
-                    console.log('Key saved to Firebase');
-                    // Also save to local storage
-                    saveKeyToLocalStorage(keyData);
-                    return keyData;
-                })
-                .catch(error => {
-                    console.error('Error saving key to Firebase:', error);
-                    throw error;
-                });
+            await database.ref('keys/' + key).set(keyData);
+            
+            // Verify the write by reading back
+            const confirm = await database.ref('keys/' + key).once('value');
+            
+            if (confirm.exists()) {
+                console.log('Key saved to Firebase and verified');
+                // Save minimal data to local storage
+                saveKeyToLocalStorage({...keyData, key});
+                return keyData;
+            } else {
+                throw new Error('Firebase write verification failed');
+            }
         }
 
-        // Save key to local storage
+        // Save key to local storage (cache only)
         function saveKeyToLocalStorage(keyData) {
-            let keys = JSON.parse(localStorage.getItem('userKeys')) || [];
+            let keys = JSON.parse(localStorage.getItem('strovenKeys')) || [];
             
             // Check if key already exists
             const existingKeyIndex = keys.findIndex(k => k.key === keyData.key);
@@ -552,47 +642,51 @@
                 keys.push(keyData);
             }
             
-            localStorage.setItem('userKeys', JSON.stringify(keys));
+            localStorage.setItem('strovenKeys', JSON.stringify(keys));
+            localStorage.setItem('strovenCurrentKey', keyData.key);
             userKeys = keys.filter(key => key.isActive !== false);
         }
 
         // Load keys from local storage
         function loadKeysFromLocalStorage() {
-            const keys = JSON.parse(localStorage.getItem('userKeys')) || [];
+            const keys = JSON.parse(localStorage.getItem('strovenKeys')) || [];
             // Only show active keys
             userKeys = keys.filter(key => key.isActive !== false);
             displayKeys();
         }
 
         // Remove key (mark as inactive)
-        function removeKey(keyToRemove) {
-            let keys = JSON.parse(localStorage.getItem('userKeys')) || [];
+        async function removeKey(keyToRemove) {
+            if (!checkOnlineStatus()) {
+                showNotification('You are offline. Cannot remove key.', true);
+                return;
+            }
             
-            // Mark key as inactive in local storage
-            keys = keys.map(key => {
-                if (key.key === keyToRemove) {
-                    return { ...key, isActive: false };
-                }
-                return key;
-            });
-            
-            localStorage.setItem('userKeys', JSON.stringify(keys));
-            
-            // Also update Firebase
-            database.ref('keys/' + keyToRemove).update({ 
+            // Mark key as inactive in Firebase
+            await database.ref('keys/' + keyToRemove).update({ 
                 isActive: false,
-                deactivatedAt: new Date().toISOString()
-            })
-            .then(() => {
-                console.log('Key deactivated in Firebase');
-            })
-            .catch(error => {
-                console.error('Error deactivating key in Firebase:', error);
+                deactivatedAt: Date.now()
             });
             
-            // Reload keys
-            loadKeysFromLocalStorage();
-            showNotification('Key removed successfully');
+            // Verify the update
+            const confirm = await database.ref('keys/' + keyToRemove).once('value');
+            if (confirm.exists() && confirm.val().isActive === false) {
+                // Remove from local storage
+                let keys = JSON.parse(localStorage.getItem('strovenKeys')) || [];
+                keys = keys.filter(key => key.key !== keyToRemove);
+                localStorage.setItem('strovenKeys', JSON.stringify(keys));
+                
+                // If current key is being removed, clear current session
+                if (localStorage.getItem('strovenCurrentKey') === keyToRemove) {
+                    localStorage.removeItem('strovenCurrentKey');
+                }
+                
+                // Reload keys
+                loadKeysFromLocalStorage();
+                showNotification('Key removed successfully');
+            } else {
+                showNotification('Error removing key', true);
+            }
         }
 
         // Display keys on home page
@@ -666,8 +760,9 @@
         }
 
         // Show notification
-        function showNotification(message) {
+        function showNotification(message, isError = false) {
             notification.textContent = message;
+            notification.className = isError ? 'notification error' : 'notification';
             notification.style.display = 'block';
             setTimeout(() => {
                 notification.style.display = 'none';
@@ -683,9 +778,8 @@
                 if (keyData && keyData.isActive !== false) {
                     // Update last accessed time
                     await database.ref('keys/' + key).update({
-                        lastAccessed: new Date().toISOString()
+                        lastAccessed: Date.now()
                     });
-                    
                     return keyData;
                 }
                 return null;
@@ -695,41 +789,110 @@
             }
         }
 
+        // Login verification from Firebase
+        async function verifyLogin(key, pin) {
+            try {
+                const keyData = await checkKeyInFirebase(key);
+                
+                if (!keyData) {
+                    return { success: false, message: 'Invalid key or key has been deactivated' };
+                }
+                
+                if (keyData.password !== pin) {
+                    return { success: false, message: 'Incorrect PIN' };
+                }
+                
+                return { success: true, data: keyData };
+            } catch (error) {
+                console.error('Login verification error:', error);
+                return { success: false, message: 'Network error. Please try again.' };
+            }
+        }
+
+        // Auto login on page load
+        async function autoLogin() {
+            const cachedKey = localStorage.getItem('strovenCurrentKey');
+            if (cachedKey) {
+                try {
+                    if (!checkOnlineStatus()) {
+                        // If offline, use cached data
+                        const keys = JSON.parse(localStorage.getItem('strovenKeys')) || [];
+                        const cachedData = keys.find(k => k.key === cachedKey);
+                        if (cachedData) {
+                            loadKeysFromLocalStorage();
+                            showPage(homePage);
+                            showNotification(`Welcome back, ${cachedData.name}! (Offline Mode)`);
+                        }
+                        return;
+                    }
+                    
+                    const keyData = await checkKeyInFirebase(cachedKey);
+                    if (keyData && keyData.isActive !== false) {
+                        // Update local storage with fresh data
+                        saveKeyToLocalStorage({...keyData, key: cachedKey});
+                        loadKeysFromLocalStorage();
+                        showPage(homePage);
+                        showNotification(`Welcome back, ${keyData.name}!`);
+                    } else {
+                        // Key is invalid, clear local storage
+                        localStorage.removeItem('strovenCurrentKey');
+                    }
+                } catch (error) {
+                    console.error('Auto login error:', error);
+                    // If online check fails, try cached data
+                    const keys = JSON.parse(localStorage.getItem('strovenKeys')) || [];
+                    const cachedData = keys.find(k => k.key === cachedKey);
+                    if (cachedData) {
+                        loadKeysFromLocalStorage();
+                        showPage(homePage);
+                        showNotification(`Welcome back, ${cachedData.name}! (Using cached data)`);
+                    }
+                }
+            }
+        }
+
         // Event Listeners
         createKeyBtn.addEventListener('click', () => {
             // Reset form
             userName.value = '';
             userEmail.value = '';
-            userPassword.value = '';
+            userPin.value = '';
             nameError.style.display = 'none';
             emailError.style.display = 'none';
-            passwordError.style.display = 'none';
+            pinError.style.display = 'none';
             
             showPage(createKeyPage);
         });
 
         loginKeyBtn.addEventListener('click', () => {
             loginKey.value = '';
-            loginError.style.display = 'none';
+            loginPin.value = '';
+            loginKeyError.style.display = 'none';
+            loginPinError.style.display = 'none';
             showPage(loginPage);
         });
 
         generateKeyBtn.addEventListener('click', async () => {
+            if (!checkOnlineStatus()) {
+                showNotification('You are offline. Cannot create key.', true);
+                return;
+            }
+            
             if (validateUserDetails()) {
                 // Show loading state
                 generateKeyBtn.disabled = true;
                 generateKeyBtn.textContent = 'Generating Key...';
                 
                 try {
-                    // Generate key
-                    const key = generateUniqueKey();
+                    // Generate unique key
+                    const key = await generateUniqueKey();
                     generatedKey.textContent = key;
                     
                     // Save user data
                     const userData = {
                         name: userName.value,
                         email: userEmail.value,
-                        password: userPassword.value
+                        pin: userPin.value
                     };
                     
                     // Display key info
@@ -737,12 +900,14 @@
                     keyUserEmail.textContent = userData.email;
                     keyCreatedAt.textContent = new Date().toLocaleString();
                     
-                    // Save to Firebase and local storage
+                    // Save to Firebase with verification
                     await saveKeyToFirebase(key, userData);
                     
                     showPage(keyDisplayPage);
+                    showNotification('Key created successfully!');
                 } catch (error) {
-                    showNotification('Error generating key. Please try again.');
+                    console.error('Error generating key:', error);
+                    showNotification('Error generating key. Please try again.', true);
                 } finally {
                     // Reset button state
                     generateKeyBtn.disabled = false;
@@ -774,55 +939,51 @@
 
         performLoginBtn.addEventListener('click', async () => {
             const key = loginKey.value.trim();
+            const pin = loginPin.value.trim();
             
-            if (!key) {
-                loginError.textContent = 'Please enter your key';
-                loginError.style.display = 'block';
+            if (!checkOnlineStatus()) {
+                showNotification('You are offline. Cannot login.', true);
                 return;
+            }
+            
+            // Basic validation
+            if (!key) {
+                loginKeyError.textContent = 'Please enter your key';
+                loginKeyError.style.display = 'block';
+                return;
+            } else {
+                loginKeyError.style.display = 'none';
+            }
+            
+            if (!pin) {
+                loginPinError.textContent = 'Please enter your PIN';
+                loginPinError.style.display = 'block';
+                return;
+            } else {
+                loginPinError.style.display = 'none';
             }
             
             // Show loading state
             performLoginBtn.disabled = true;
-            performLoginBtn.textContent = 'Checking Key...';
-            loginError.style.display = 'none';
+            performLoginBtn.textContent = 'Verifying...';
             
             try {
-                // First check local storage
-                const localKeys = JSON.parse(localStorage.getItem('userKeys')) || [];
-                const localKeyData = localKeys.find(k => k.key === key && k.isActive !== false);
+                const result = await verifyLogin(key, pin);
                 
-                if (localKeyData) {
-                    // Key found in local storage
+                if (result.success) {
+                    // Save to local storage
+                    saveKeyToLocalStorage({...result.data, key});
                     loadKeysFromLocalStorage();
                     showPage(homePage);
-                    showNotification('Login successful!');
+                    showNotification(`Login successful! Welcome ${result.data.name}`);
                 } else {
-                    // Key not in local storage, check Firebase
-                    loginError.textContent = 'Checking key in database...';
-                    loginError.style.display = 'block';
-                    loginError.classList.add('loading');
-                    
-                    const firebaseKeyData = await checkKeyInFirebase(key);
-                    
-                    if (firebaseKeyData) {
-                        // Key found in Firebase - save to local storage and login
-                        saveKeyToLocalStorage(firebaseKeyData);
-                        loadKeysFromLocalStorage();
-                        showPage(homePage);
-                        showNotification('Login successful! Key added to this device.');
-                    } else {
-                        loginError.textContent = 'Invalid key or key has been removed';
-                        loginError.style.display = 'block';
-                        loginError.classList.remove('loading');
-                        loginError.classList.add('error');
-                    }
+                    loginKeyError.textContent = result.message;
+                    loginKeyError.style.display = 'block';
                 }
             } catch (error) {
                 console.error('Login error:', error);
-                loginError.textContent = 'Network error. Please try again.';
-                loginError.style.display = 'block';
-                loginError.classList.remove('loading');
-                loginError.classList.add('error');
+                loginKeyError.textContent = 'Network error. Please try again.';
+                loginKeyError.style.display = 'block';
             } finally {
                 // Reset button state
                 performLoginBtn.disabled = false;
@@ -835,20 +996,46 @@
         });
 
         logoutBtn.addEventListener('click', () => {
+            localStorage.removeItem('strovenCurrentKey');
             showPage(welcomePage);
+            showNotification('Logged out successfully');
+        });
+
+        // Toggle PIN visibility
+        togglePinBtn.addEventListener('click', () => {
+            const type = userPin.getAttribute('type') === 'password' ? 'text' : 'password';
+            userPin.setAttribute('type', type);
+            togglePinBtn.innerHTML = type === 'password' ? '<i class="fas fa-eye"></i>' : '<i class="fas fa-eye-slash"></i>';
+        });
+
+        toggleLoginPinBtn.addEventListener('click', () => {
+            const type = loginPin.getAttribute('type') === 'password' ? 'text' : 'password';
+            loginPin.setAttribute('type', type);
+            toggleLoginPinBtn.innerHTML = type === 'password' ? '<i class="fas fa-eye"></i>' : '<i class="fas fa-eye-slash"></i>';
+        });
+
+        // Online/offline event listeners
+        window.addEventListener('online', () => {
+            checkOnlineStatus();
+            showNotification('Connection restored');
+        });
+
+        window.addEventListener('offline', () => {
+            checkOnlineStatus();
+            showNotification('You are now offline', true);
+        });
+
+        // Global error handler
+        window.addEventListener('error', (e) => {
+            console.error('Global error:', e.message);
+            showNotification('Unexpected error occurred. Please check your connection.', true);
         });
 
         // Initialize
         document.addEventListener('DOMContentLoaded', () => {
-            // Check if user has keys in local storage
-            loadKeysFromLocalStorage();
-            
-            // Check if user was previously logged in
-            const keys = JSON.parse(localStorage.getItem('userKeys')) || [];
-            if (keys.length > 0) {
-                // Auto-login if keys exist
-                showPage(homePage);
-            }
+            checkOnlineStatus();
+            // Auto login if valid key exists
+            autoLogin();
         });
     </script>
 </body>
